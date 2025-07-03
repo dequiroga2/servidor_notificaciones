@@ -8,21 +8,26 @@ app.use(express.json()); // Middleware para que Express entienda JSON
 
 // Configuración de CORS: permite que solo tu app local de React se conecte.
 // ¡IMPORTANTE! Cuando subas tu app de React a un dominio, deberás añadirlo aquí.
+// --- INICIO DE LA CONFIGURACIÓN DE CORS (CORREGIDA) ---
+
+// Lista de dominios que tienen permiso para conectarse a este servidor
 const allowedOrigins = [
-  'http://localhost:5173', // Para tu desarrollo local
-  // 'https://tu-app.onrender.com' // <-- Añade aquí la URL de tu app de React cuando la despliegues
+  'http://localhost:5173' // Para tu desarrollo local
+  // Cuando despliegues tu app de React, añadirás su URL aquí.
+  // Ej: 'https://tu-app-de-chat.onrender.com' 
 ];
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Permite peticiones sin origen (como las de Postman o n8n) o si el origen está en la lista
-    if (!origin || allowedOrigins.includes(origin)) {
+    // La petición se permite si su origen está en la lista de permitidos
+    if (allowedOrigins.includes(origin) || !origin) { // !origin permite herramientas como Postman o n8n
       callback(null, true);
     } else {
-      callback(new Error('No permitido por CORS'));
+      callback(new Error('No permitido por la política de CORS'));
     }
   }
 };
+
 app.use(cors(corsOptions));
 
 
