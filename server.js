@@ -1,90 +1,98 @@
 // 1. IMPORTAR DEPENDENCIAS
 const express = require('express');
 const cors = require('cors');
+// ✅ NUEVO: Importar Firebase Admin SDK
+const admin = require('firebase-admin');
+
+// ✅ NUEVO: Cargar las credenciales de Firebase
+const serviceAccount = require('./firebase-credentials.json');
+
+// ✅ NUEVO: Inicializar Firebase Admin
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
 
 // 2. INICIALIZAR EXPRESS Y CONFIGURAR CORS
 const app = express();
-app.use(express.json()); // Middleware para que Express entienda JSON
+app.use(express.json());
 
-// Configuración de CORS: permite que solo tu app local de React se conecte.
-// ¡IMPORTANTE! Cuando subas tu app de React a un dominio, deberás añadirlo aquí.
 const allowedOrigins = [
-  'http://localhost:5173', // Para tu desarrollo local
-  // 'https://tu-app.onrender.com' // <-- Añade aquí la URL de tu app de React cuando la despliegues
+  'http://localhost:5173'
+  // 'https://tu-app-de-chat.onrender.com' 
 ];
-
 const corsOptions = {
   origin: (origin, callback) => {
-    // Permite peticiones sin origen (como las de Postman o n8n) o si el origen está en la lista
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin) || !origin) {
       callback(null, true);
     } else {
-      callback(new Error('No permitido por CORS'));
+      callback(new Error('No permitido por la política de CORS'));
     }
   }
 };
 app.use(cors(corsOptions));
 
 
-// 3. ALMACENAMIENTO EN MEMORIA PARA CLIENTES CONECTADOS
-// Guardaremos aquí las conexiones abiertas de cada usuario.
-// La clave es el `userId` y el valor es la respuesta (res) del navegador.
-// Nota: Para una app a gran escala, se usaría una base de datos como Redis.
+// 3. ALMACENAMIENTO EN MEMORIA (Ahora la clave será el UID de Firebase)
 let clients = {};
 
-// 4. ENDPOINT PARA QUE REACT SE CONECTE (SSE)
-app.get('/events', (req, res) => {
-  // Configurar las cabeceras para una conexión SSE
+
+// 4. ENDPOINT PARA QUE REACT SE CONECTE (SSE) - ACTUALIZADO
+app.get('/events', async (req, res) => { // ✅ La función ahora es async
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders(); // Enviar las cabeceras inmediatamente
+  res.flushHeaders();
 
-  // Obtener el ID del usuario desde la URL (ej: /events?userId=abc)
-  const userId = req.query.userId;
-  if (!userId) {
-    return res.status(400).send('userId es requerido');
+  // ✅ ACTUALIZADO: Obtener el token desde la URL en lugar de userId
+  const token = req.query.token;
+  if (!token) {
+    return res.status(400).send('token es requerido');
   }
 
-  // Guardar la conexión del cliente para poder enviarle mensajes después
-  clients[userId] = res;
-  console.log(`Cliente conectado: ${userId}`);
+  let uid;
+  try {
+    // ✅ ACTUALIZADO: Verificar el token con Firebase
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    uid = decodedToken.uid;
+  } catch (error) {
+    console.error('Token inválido:', error.message);
+    return res.status(401).send('Token inválido');
+  }
 
-  // Enviar un comentario inicial para mantener la conexión abierta
+  // ✅ ACTUALIZADO: Guardar la conexión usando el UID seguro de Firebase
+  clients[uid] = res;
+  console.log(`Cliente conectado con UID: ${uid}`);
+
   res.write(':ok\n\n');
 
-  // Limpiar la conexión cuando el cliente se desconecte
   req.on('close', () => {
-    console.log(`Cliente desconectado: ${userId}`);
-    delete clients[userId]; // Eliminar al cliente de la lista
+    console.log(`Cliente desconectado con UID: ${uid}`);
+    delete clients[uid];
   });
 });
 
 
-// 5. ENDPOINT PARA QUE N8N ENVÍE LAS NOTIFICACIONES
+// 5. ENDPOINT PARA QUE N8N ENVÍE LAS NOTIFICACIONES - ACTUALIZADO
 app.post('/notify', (req, res) => {
-  // Obtener los datos que envía n8n
-  const { userId, videoUrl } = req.body;
+  // ✅ ACTUALIZADO: Ahora esperamos `uid` en lugar de `userId`
+  const { uid, videoUrl } = req.body;
 
-  if (!userId || !videoUrl) {
-    return res.status(400).send('userId y videoUrl son requeridos');
+  if (!uid || !videoUrl) {
+    return res.status(400).send('uid y videoUrl son requeridos');
   }
 
-  console.log(`Notificación recibida para ${userId} con URL: ${videoUrl}`);
+  console.log(`Notificación recibida para UID ${uid} con URL: ${videoUrl}`);
 
-  // Buscar al cliente conectado que corresponde a ese userId
-  const client = clients[userId];
+  // ✅ ACTUALIZADO: Buscar al cliente por su UID
+  const client = clients[uid];
 
   if (client) {
-    // Si el cliente está conectado, le enviamos los datos
-    // El formato "data: ...\n\n" es parte del protocolo SSE
     client.write(`data: ${JSON.stringify({ videoUrl })}\n\n`);
-    console.log(`Notificación enviada a ${userId}`);
-    // Respondemos a n8n que todo salió bien
+    console.log(`Notificación enviada a UID ${uid}`);
     res.status(200).send({ message: 'Notificación enviada' });
   } else {
-    // Si el cliente ya no está conectado
-    console.log(`Cliente ${userId} no encontrado.`);
+    console.log(`Cliente con UID ${uid} no encontrado.`);
     res.status(404).send({ message: 'Cliente no encontrado' });
   }
 });
@@ -93,5 +101,5 @@ app.post('/notify', (req, res) => {
 // 6. INICIAR EL SERVIDOR
 const PORT = 4000;
 app.listen(PORT, () => {
-  console.log(`✅ Servidor de notificaciones corriendo en http://localhost:${PORT}`);
+  console.log(`✅ Servidor de notificaciones (seguro) corriendo en http://localhost:${PORT}`);
 });
