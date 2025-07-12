@@ -17,19 +17,37 @@ admin.initializeApp({
 const app = express();
 app.use(express.json());
 
+<<<<<<< HEAD
 const allowedOrigins = [
   'http://localhost:5173'
   // 'https://tu-app-de-chat.onrender.com' 
+=======
+// Configuración de CORS: permite que solo tu app local de React se conecte.
+// ¡IMPORTANTE! Cuando subas tu app de React a un dominio, deberás añadirlo aquí.
+// --- INICIO DE LA CONFIGURACIÓN DE CORS (CORREGIDA) ---
+
+// Lista de dominios que tienen permiso para conectarse a este servidor
+const allowedOrigins = [
+  'http://localhost:5173' // Para tu desarrollo local
+  // Cuando despliegues tu app de React, añadirás su URL aquí.
+  // Ej: 'https://tu-app-de-chat.onrender.com' 
+>>>>>>> 15df23c0081af697e45a9d9a99d0343588ecebdd
 ];
 const corsOptions = {
   origin: (origin, callback) => {
+<<<<<<< HEAD
     if (allowedOrigins.includes(origin) || !origin) {
+=======
+    // La petición se permite si su origen está en la lista de permitidos
+    if (allowedOrigins.includes(origin) || !origin) { // !origin permite herramientas como Postman o n8n
+>>>>>>> 15df23c0081af697e45a9d9a99d0343588ecebdd
       callback(null, true);
     } else {
       callback(new Error('No permitido por la política de CORS'));
     }
   }
 };
+
 app.use(cors(corsOptions));
 
 
@@ -101,5 +119,10 @@ app.post('/notify', (req, res) => {
 // 6. INICIAR EL SERVIDOR
 const PORT = 4000;
 app.listen(PORT, () => {
+<<<<<<< HEAD
   console.log(`✅ Servidor de notificaciones (seguro) corriendo en http://localhost:${PORT}`);
 });
+=======
+  console.log(`✅ Servidor de notificaciones corriendo en http://localhost:${PORT}`);
+});
+>>>>>>> 15df23c0081af697e45a9d9a99d0343588ecebdd
