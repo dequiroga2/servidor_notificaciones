@@ -36,6 +36,19 @@ app.use(cors(corsOptions));
 // 3. ALMACENAMIENTO EN MEMORIA (Ahora la clave será el UID de Firebase)
 let clients = {};
 
+const verifyN8nSecret = (req, res, next) => {
+  // Lee la clave secreta desde un header personalizado (ej. 'x-n8n-secret')
+  const secretKey = req.headers['x-n8n-secret'];
+  
+  // Compara la clave recibida con la que tienes guardada en tus variables de entorno
+  if (secretKey && secretKey === process.env.N8N_SECRET_KEY) {
+    next(); // Si la clave es correcta, permite que la petición continúe.
+  } else {
+    console.warn('Intento de acceso a /notify con clave secreta inválida.');
+    res.status(403).send('Acceso denegado: Clave secreta inválida.'); // Si no, rechaza la petición.
+  }
+};
+
 
 // 4. ENDPOINT PARA QUE REACT SE CONECTE (SSE) - ACTUALIZADO
 app.get('/events', async (req, res) => { // ✅ La función ahora es async
@@ -74,7 +87,7 @@ app.get('/events', async (req, res) => { // ✅ La función ahora es async
 
 
 // 5. ENDPOINT PARA QUE N8N ENVÍE LAS NOTIFICACIONES - ACTUALIZADO
-app.post('/notify', (req, res) => {
+app.post('/notify', verifyN8nSecret, (req, res) => {
   // ✅ ACTUALIZADO: Ahora esperamos `uid` en lugar de `userId`
   const { uid, videoUrl, imageUrl } = req.body;
 
@@ -95,7 +108,7 @@ app.post('/notify', (req, res) => {
       payload = { imageUrl };
     }
 
-    client.write(`data: ${JSON.stringify({ payload })}\n\n`);
+    client.write(`data: ${JSON.stringify(payload)}\n\n`);
     console.log(`Notificación enviada a UID ${uid}`);
     res.status(200).send({ message: 'Notificación enviada' });
   } else {
