@@ -76,19 +76,26 @@ app.get('/events', async (req, res) => { // ✅ La función ahora es async
 // 5. ENDPOINT PARA QUE N8N ENVÍE LAS NOTIFICACIONES - ACTUALIZADO
 app.post('/notify', (req, res) => {
   // ✅ ACTUALIZADO: Ahora esperamos `uid` en lugar de `userId`
-  const { uid, videoUrl } = req.body;
+  const { uid, videoUrl, imageUrl } = req.body;
 
-  if (!uid || !videoUrl) {
-    return res.status(400).send('uid y videoUrl son requeridos');
+  if (!uid || (!videoUrl && !imageUrl)) {
+    return res.status(400).send('Se requiere uid y al menos una URL (videoUrl o imageUrl)');
   }
-
-  console.log(`Notificación recibida para UID ${uid} con URL: ${videoUrl}`);
 
   // ✅ ACTUALIZADO: Buscar al cliente por su UID
   const client = clients[uid];
 
   if (client) {
-    client.write(`data: ${JSON.stringify({ videoUrl })}\n\n`);
+    let payload = {};
+    if (videoUrl) {
+      console.log(`Notificación de VIDEO para UID ${uid}`);
+      payload = { videoUrl };
+    } else if (imageUrl) {
+      console.log(`Notificación de IMAGEN para UID ${uid}`);
+      payload = { imageUrl };
+    }
+
+    client.write(`data: ${JSON.stringify({ payload })}\n\n`);
     console.log(`Notificación enviada a UID ${uid}`);
     res.status(200).send({ message: 'Notificación enviada' });
   } else {
